@@ -67,7 +67,7 @@ func TestAccDigitalOceanDroplet_Basic(t *testing.T) {
 					resource.TestCheckResourceAttr(
 						"digitalocean_droplet.foobar", "name", fmt.Sprintf("foo-%d", rInt)),
 					resource.TestCheckResourceAttr(
-						"digitalocean_droplet.foobar", "size", "512mb"),
+						"digitalocean_droplet.foobar", "size", "s-1vcpu-1gb"),
 					resource.TestCheckResourceAttr(
 						"digitalocean_droplet.foobar", "price_hourly", "0.00744"),
 					resource.TestCheckResourceAttr(
@@ -131,7 +131,7 @@ func TestAccDigitalOceanDroplet_withSSH(t *testing.T) {
 					resource.TestCheckResourceAttr(
 						"digitalocean_droplet.foobar", "name", fmt.Sprintf("foo-%d", rInt)),
 					resource.TestCheckResourceAttr(
-						"digitalocean_droplet.foobar", "size", "512mb"),
+						"digitalocean_droplet.foobar", "size", "s-1vcpu-1gb"),
 					resource.TestCheckResourceAttr(
 						"digitalocean_droplet.foobar", "image", "centos-7-x64"),
 					resource.TestCheckResourceAttr(
@@ -257,7 +257,7 @@ func TestAccDigitalOceanDroplet_ResizeSmaller(t *testing.T) {
 					resource.TestCheckResourceAttr(
 						"digitalocean_droplet.foobar", "name", fmt.Sprintf("foo-%d", rInt)),
 					resource.TestCheckResourceAttr(
-						"digitalocean_droplet.foobar", "size", "512mb"),
+						"digitalocean_droplet.foobar", "size", "s-1vcpu-1gb"),
 					resource.TestCheckResourceAttr(
 						"digitalocean_droplet.foobar", "disk", "20"),
 				),
@@ -352,7 +352,7 @@ func TestAccDigitalOceanDroplet_UpdateTags(t *testing.T) {
 	})
 }
 
-func TestAccDigitalOceanDroplet_PrivateNetworkingIpv6(t *testing.T) {
+func TestAccDigitalOceanDroplet_VPCAndIpv6(t *testing.T) {
 	var droplet godo.Droplet
 	rInt := acctest.RandInt()
 
@@ -362,12 +362,12 @@ func TestAccDigitalOceanDroplet_PrivateNetworkingIpv6(t *testing.T) {
 		CheckDestroy: testAccCheckDigitalOceanDropletDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccCheckDigitalOceanDropletConfig_PrivateNetworkingIpv6(rInt),
+				Config: testAccCheckDigitalOceanDropletConfig_VPCAndIpv6(rInt),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckDigitalOceanDropletExists("digitalocean_droplet.foobar", &droplet),
 					testAccCheckDigitalOceanDropletAttributes_PrivateNetworkingIpv6(&droplet),
-					resource.TestCheckResourceAttr(
-						"digitalocean_droplet.foobar", "private_networking", "true"),
+					resource.TestCheckResourceAttrSet(
+						"digitalocean_droplet.foobar", "vpc_uuid"),
 					resource.TestCheckResourceAttr(
 						"digitalocean_droplet.foobar", "ipv6", "true"),
 				),
@@ -394,7 +394,8 @@ func TestAccDigitalOceanDroplet_UpdatePrivateNetworkingIpv6(t *testing.T) {
 						"digitalocean_droplet.foobar", "name", fmt.Sprintf("foo-%d", rInt)),
 				),
 			},
-
+			// For "private_networking," this is now a effectively a no-opt only updating state.
+			// All Droplets are assigned to a VPC by default. The API should still respond successfully.
 			{
 				Config: testAccCheckDigitalOceanDropletConfig_PrivateNetworkingIpv6(rInt),
 				Check: resource.ComposeTestCheckFunc(
@@ -539,7 +540,7 @@ func testAccCheckDigitalOceanDropletAttributes(droplet *godo.Droplet) resource.T
 			return fmt.Errorf("Bad image_slug: %s", droplet.Image.Slug)
 		}
 
-		if droplet.Size.Slug != "512mb" {
+		if droplet.Size.Slug != "s-1vcpu-1gb" {
 			return fmt.Errorf("Bad size_slug: %s", droplet.Size.Slug)
 		}
 
@@ -611,12 +612,15 @@ func testAccCheckDigitalOceanDropletAttributes_PrivateNetworkingIpv6(droplet *go
 			return fmt.Errorf("Bad image_slug: %s", droplet.Image.Slug)
 		}
 
-		if droplet.Size.Slug != "512mb" {
+		if droplet.Size.Slug != "s-1vcpu-1gb" {
 			return fmt.Errorf("Bad size_slug: %s", droplet.Size.Slug)
 		}
 
 		if droplet.Region.Slug != "nyc3" {
-			return fmt.Errorf("Bad region_slug: %s", droplet.Region.Slug)
+			// TODO: Remove s2r1 conditional
+			if droplet.Region.Slug != "s2r1" {
+				return fmt.Errorf("Bad region_slug: %s", droplet.Region.Slug)
+			}
 		}
 
 		if findIPv4AddrByType(droplet, "private") == "" {
@@ -698,7 +702,7 @@ func testAccCheckDigitalOceanDropletConfig_basic(rInt int) string {
 	return fmt.Sprintf(`
 resource "digitalocean_droplet" "foobar" {
   name      = "foo-%d"
-  size      = "512mb"
+  size      = "s-1vcpu-1gb"
   image     = "centos-7-x64"
   region    = "nyc3"
   user_data = "foobar"
@@ -713,7 +717,7 @@ data "digitalocean_image" "foobar" {
 
 resource "digitalocean_droplet" "foobar" {
   name      = "foo-%d"
-  size      = "512mb"
+  size      = "s-1vcpu-1gb"
   image     = "${data.digitalocean_image.foobar.id}"
   region    = "nyc3"
   user_data = "foobar"
@@ -729,7 +733,7 @@ resource "digitalocean_ssh_key" "foobar" {
 
 resource "digitalocean_droplet" "foobar" {
   name      = "foo-%d"
-  size      = "512mb"
+  size      = "s-1vcpu-1gb"
   image     = "centos-7-x64"
   region    = "nyc3"
   user_data = "foobar"
@@ -745,7 +749,7 @@ resource "digitalocean_tag" "barbaz" {
 
 resource "digitalocean_droplet" "foobar" {
   name      = "foo-%d"
-  size      = "512mb"
+  size      = "s-1vcpu-1gb"
   image     = "centos-7-x64"
   region    = "nyc3"
   user_data = "foobar"
@@ -758,7 +762,7 @@ func testAccCheckDigitalOceanDropletConfig_userdata_update(rInt int) string {
 	return fmt.Sprintf(`
 resource "digitalocean_droplet" "foobar" {
   name      = "foo-%d"
-  size      = "512mb"
+  size      = "s-1vcpu-1gb"
   image     = "centos-7-x64"
   region    = "nyc3"
   user_data = "foobar foobar"
@@ -807,13 +811,31 @@ func testAccCheckDigitalOceanDropletConfig_PrivateNetworkingIpv6(rInt int) strin
 	return fmt.Sprintf(`
 resource "digitalocean_droplet" "foobar" {
   name               = "foo-%d"
-  size               = "512mb"
+  size               = "s-1vcpu-1gb"
   image              = "centos-7-x64"
   region             = "nyc3"
   ipv6               = true
   private_networking = true
 }
 `, rInt)
+}
+
+func testAccCheckDigitalOceanDropletConfig_VPCAndIpv6(rInt int) string {
+	return fmt.Sprintf(`
+resource "digitalocean_vpc" "foobar" {
+  name        = "%s"
+  region      = "s2r1" # "nyc3"
+}
+
+resource "digitalocean_droplet" "foobar" {
+  name     = "foo-%d"
+  size     = "s-1vcpu-1gb"
+  image    = "centos-7-x64"
+  region   = "s2r1" # "nyc3"
+  ipv6     = true
+  vpc_uuid = digitalocean_vpc.foobar.id
+}
+`, randomTestName(), rInt)
 }
 
 func testAccCheckDigitalOceanDropletConfig_Monitoring(rInt int) string {
@@ -849,7 +871,7 @@ resource "digitalocean_droplet" "foobar" {
   name = "tf-acc-test-%d-${count.index}"
   region = "sfo2"
   image = "centos-7-x64"
-  size = "512mb"
+  size = "s-1vcpu-1gb"
   volume_ids = ["${count.index == 0 ? digitalocean_volume.myvol-01.id : digitalocean_volume.myvol-02.id}"]
 }
 `, rInt, rInt, rInt)
@@ -859,7 +881,7 @@ func testAccCheckDigitalOceanDropletConfig_EnableBackups(rInt int) string {
 	return fmt.Sprintf(`
 resource "digitalocean_droplet" "foobar" {
   name      = "foo-%d"
-  size      = "512mb"
+  size      = "s-1vcpu-1gb"
   image     = "centos-7-x64"
   region    = "nyc3"
   user_data = "foobar"
@@ -871,7 +893,7 @@ func testAccCheckDigitalOceanDropletConfig_DisableBackups(rInt int) string {
 	return fmt.Sprintf(`
 resource "digitalocean_droplet" "foobar" {
   name      = "foo-%d"
-  size      = "512mb"
+  size      = "s-1vcpu-1gb"
   image     = "centos-7-x64"
   region    = "nyc3"
   user_data = "foobar"

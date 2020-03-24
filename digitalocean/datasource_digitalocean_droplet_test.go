@@ -29,13 +29,14 @@ func TestAccDataSourceDigitalOceanDroplet_BasicByName(t *testing.T) {
 					resource.TestCheckResourceAttr(
 						"data.digitalocean_droplet.foobar", "image", "centos-7-x64"),
 					resource.TestCheckResourceAttr(
-						"data.digitalocean_droplet.foobar", "region", "nyc3"),
+						"data.digitalocean_droplet.foobar", "region", "s2r1"), // "nyc3"),
 					resource.TestCheckResourceAttr(
 						"data.digitalocean_droplet.foobar", "ipv6", "true"),
 					resource.TestCheckResourceAttr(
-						"data.digitalocean_droplet.foobar", "private_networking", "false"),
+						"data.digitalocean_droplet.foobar", "private_networking", "true"),
 					resource.TestCheckResourceAttrSet("data.digitalocean_droplet.foobar", "urn"),
 					resource.TestCheckResourceAttrSet("data.digitalocean_droplet.foobar", "created_at"),
+					resource.TestCheckResourceAttrSet("data.digitalocean_droplet.foobar", "vpc_uuid"),
 				),
 			},
 		},
@@ -148,25 +149,31 @@ func testAccCheckDataSourceDigitalOceanDropletExists(n string, droplet *godo.Dro
 
 func testAccCheckDataSourceDigitalOceanDropletConfig_basicByName(name string) string {
 	return fmt.Sprintf(`
+resource "digitalocean_vpc" "foobar" {
+  name        = "%s"
+  region      = "s2r1" # "nyc3"
+}
+
 resource "digitalocean_droplet" "foo" {
-  name   = "%s"
-  size   = "512mb"
-  image  = "centos-7-x64"
-  region = "nyc3"
-  ipv6   = true
+  name     = "%s"
+  size     = "s-1vcpu-1gb"
+  image    = "centos-7-x64"
+  region   = "s2r1" # "nyc3"
+  ipv6     = true
+  vpc_uuid = digitalocean_vpc.foobar.id
 }
 
 data "digitalocean_droplet" "foobar" {
-  name = "${digitalocean_droplet.foo.name}"
+  name = digitalocean_droplet.foo.name
 }
-`, name)
+`, randomTestName(), name)
 }
 
 func testAccCheckDataSourceDigitalOceanDropletConfig_basicById(name string) string {
 	return fmt.Sprintf(`
 resource "digitalocean_droplet" "foo" {
   name   = "%s"
-  size   = "512mb"
+  size   = "s-1vcpu-1gb"
   image  = "centos-7-x64"
   region = "nyc3"
   ipv6   = true
@@ -186,7 +193,7 @@ resource "digitalocean_tag" "foo" {
 
 resource "digitalocean_droplet" "foo" {
   name   = "%s"
-  size   = "512mb"
+  size   = "s-1vcpu-1gb"
   image  = "centos-7-x64"
   region = "nyc3"
   ipv6   = true
@@ -203,7 +210,7 @@ resource "digitalocean_tag" "foo" {
 
 resource "digitalocean_droplet" "foo" {
   name   = "%s"
-  size   = "512mb"
+  size   = "s-1vcpu-1gb"
   image  = "centos-7-x64"
   region = "nyc3"
   ipv6   = true
